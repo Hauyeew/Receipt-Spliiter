@@ -1,4 +1,5 @@
 import { createId } from '@/lib/create-id';
+import type { ParsedReceipt } from '@/lib/receipt-scanner';
 import { computeTipTotal } from '@/lib/split-calculator';
 import type { LineItem } from '@/models/LineItem';
 import type { Participant } from '@/models/Participant';
@@ -45,12 +46,49 @@ export function createLineItem(partial?: Partial<LineItem>): LineItem {
     quantity,
     unitPrice,
     lineTotal: roundMoney(quantity * unitPrice),
-    claimedBy: partial?.claimedBy ?? [],
+    claimedBy: partial?.claimedBy ?? {},
   };
 }
 
 export function createParticipant(name: string): Participant {
   return { id: createId(), name };
+}
+
+export function createSessionFromParsedReceipt(parsed: ParsedReceipt, imageUri: string): SplitSession {
+  const lineItems =
+    parsed.lineItems.length > 0
+      ? parsed.lineItems.map((item) =>
+          createLineItem({
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          }),
+        )
+      : [createLineItem({ name: 'Item 1' })];
+
+  const receipt: Receipt = {
+    id: createId(),
+    imageUri,
+    merchantName: parsed.merchantName,
+    currency: 'USD',
+    lineItems,
+    subtotal: 0,
+    tax: parsed.tax ?? 0,
+    tip: 0,
+    fees: parsed.fees ?? 0,
+    total: 0,
+  };
+
+  return recalculateSessionTotal({
+    id: createId(),
+    receipt,
+    participants: [createParticipant('Me')],
+    tipMode: 'percent',
+    tipValue: 18,
+    taxAllocation: 'proportional',
+    tipAllocation: 'proportional',
+    createdAt: new Date().toISOString(),
+  });
 }
 
 export function createEmptySession(): SplitSession {
@@ -69,42 +107,6 @@ export function createEmptySession(): SplitSession {
       total: 0,
     },
     participants: [createParticipant('Me')],
-    tipMode: 'percent',
-    tipValue: 18,
-    taxAllocation: 'proportional',
-    tipAllocation: 'proportional',
-    createdAt: new Date().toISOString(),
-  });
-}
-
-export function createDemoSession(): SplitSession {
-  const me = createParticipant('Me');
-  const alex = createParticipant('Alex');
-  const sam = createParticipant('Sam');
-
-  const lineItems: LineItem[] = [
-    createLineItem({ name: 'Burger', quantity: 1, unitPrice: 15, lineTotal: 15 }),
-    createLineItem({ name: 'Pasta', quantity: 1, unitPrice: 20, lineTotal: 20 }),
-    createLineItem({ name: 'Nachos (shared)', quantity: 1, unitPrice: 12, lineTotal: 12 }),
-    createLineItem({ name: 'Soda', quantity: 3, unitPrice: 3, lineTotal: 9 }),
-  ];
-
-  const receipt: Receipt = {
-    id: createId(),
-    merchantName: "Joe's Diner",
-    currency: 'USD',
-    lineItems,
-    subtotal: 56,
-    tax: 4.48,
-    tip: 0,
-    fees: 0,
-    total: 60.48,
-  };
-
-  return recalculateSessionTotal({
-    id: createId(),
-    receipt,
-    participants: [me, alex, sam],
     tipMode: 'percent',
     tipValue: 18,
     taxAllocation: 'proportional',

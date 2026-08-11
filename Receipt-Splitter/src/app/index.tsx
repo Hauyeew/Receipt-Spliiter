@@ -1,41 +1,54 @@
 import { useRouter } from 'expo-router';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { ThemedText } from '@/components/themed-text';
+import {
+  ReceiptDivider,
+  ReceiptPaper,
+  ReceiptPalette,
+  ReceiptText,
+} from '@/components/ui/receipt-paper';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <ThemedText type="title" style={styles.title}>
-            Receipt Splitter
-          </ThemedText>
-          <ThemedText style={styles.subtitle} themeColor="textSecondary">
+    <ThemedView style={[styles.container, { backgroundColor: ReceiptPalette.counter }]}>
+      <ThemedView
+        style={[
+          styles.content,
+          {
+            paddingTop: insets.top + Spacing.four,
+            paddingBottom: insets.bottom + Spacing.four,
+          },
+        ]}>
+        <ReceiptPaper>
+          <ReceiptText center bold size="xl">
+            RECEIPT SPLITTER
+          </ReceiptText>
+          <ReceiptText center muted size="sm">
+            OPEN FOR BUSINESS
+          </ReceiptText>
+          <ReceiptDivider />
+          <ReceiptText center>
             Upload a receipt, pick what everyone ordered, and split tax and tip fairly.
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedView type="backgroundElement" style={styles.card}>
-          <ThemedText type="smallBold">How it works</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            1. Enter receipt items and charges{'\n'}
-            2. Add participants{'\n'}
-            3. Each person selects their items{'\n'}
-            4. See totals with tax and tip included
-          </ThemedText>
-          <PrimaryButton label="New split" onPress={() => router.push('/split/new')} />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
+          </ReceiptText>
+          <ReceiptDivider />
+          <ReceiptText bold size="sm">
+            HOW IT WORKS
+          </ReceiptText>
+          <ReceiptText size="sm">1. Scan or enter receipt items</ReceiptText>
+          <ReceiptText size="sm">2. Add participants</ReceiptText>
+          <ReceiptText size="sm">3. Each person selects items</ReceiptText>
+          <ReceiptText size="sm">4. See totals with tax + tip</ReceiptText>
+          <ReceiptDivider />
+        <PrimaryButton label="New split" onPress={() => router.push('/split/new')} />
+      </ReceiptPaper>
+      </ThemedView>
     </ThemedView>
   );
 }
@@ -43,37 +56,10 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
   },
-  safeArea: {
+  content: {
     flex: 1,
+    justifyContent: 'center',
     paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.four,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.two,
-  },
-  title: {
-    textAlign: 'center',
-    fontSize: 40,
-    lineHeight: 46,
-  },
-  subtitle: {
-    textAlign: 'center',
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  card: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
   },
 });

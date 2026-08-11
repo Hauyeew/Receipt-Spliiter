@@ -26,6 +26,13 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Receipt Splitter to access your photos to scan receipts.",
+          "cameraPermission": "Allow Receipt Splitter to use your camera to scan receipts."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
