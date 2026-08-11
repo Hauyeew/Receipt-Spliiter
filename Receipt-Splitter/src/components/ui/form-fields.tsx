@@ -1,7 +1,6 @@
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -25,7 +24,14 @@ export function LabeledInput({
   return (
     <View style={styles.container}>
       <ThemedText type="smallBold">{label}</ThemedText>
-      <ThemedView type="backgroundElement" style={styles.inputWrapper}>
+      <View
+        style={[
+          styles.inputWrapper,
+          {
+            backgroundColor: theme.background,
+            borderColor: theme.textSecondary,
+          },
+        ]}>
         <TextInput
           value={value}
           onChangeText={onChangeText}
@@ -34,7 +40,10 @@ export function LabeledInput({
           placeholderTextColor={theme.textSecondary}
           style={[styles.input, { color: theme.text }]}
         />
-      </ThemedView>
+        <ThemedText themeColor="textSecondary" style={styles.editHint}>
+          ✎
+        </ThemedText>
+      </View>
     </View>
   );
 }
@@ -59,13 +68,22 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
     borderRadius: Spacing.two,
+    borderWidth: 1.5,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.two + 2,
   },
   input: {
+    flex: 1,
     fontSize: 16,
     padding: 0,
+  },
+  editHint: {
+    fontSize: 14,
+    lineHeight: 18,
   },
   moneyRow: {
     flexDirection: 'row',

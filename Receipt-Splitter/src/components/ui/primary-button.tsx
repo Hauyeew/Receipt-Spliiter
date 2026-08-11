@@ -1,8 +1,8 @@
 import { Pressable, StyleSheet, type PressableProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { ReceiptPalette } from '@/components/ui/receipt-paper';
+import { Fonts, Spacing } from '@/constants/theme';
 
 type PrimaryButtonProps = PressableProps & {
   label: string;
@@ -10,9 +10,15 @@ type PrimaryButtonProps = PressableProps & {
 };
 
 export function PrimaryButton({ label, variant = 'primary', style, disabled, ...props }: PrimaryButtonProps) {
-  const theme = useTheme();
   const backgroundColor =
-    variant === 'primary' ? '#3c87f7' : variant === 'danger' ? '#e5484d' : theme.backgroundElement;
+    variant === 'primary'
+      ? ReceiptPalette.ink
+      : variant === 'danger'
+        ? '#e5484d'
+        : ReceiptPalette.paper;
+
+  const textColor =
+    variant === 'secondary' ? ReceiptPalette.ink : variant === 'primary' ? ReceiptPalette.paper : '#ffffff';
 
   return (
     <Pressable
@@ -22,14 +28,17 @@ export function PrimaryButton({ label, variant = 'primary', style, disabled, ...
         const flattenedStyle = typeof style === 'function' ? style(state) : style;
         return [
           styles.button,
-          { backgroundColor, opacity: disabled ? 0.5 : state.pressed ? 0.85 : 1 },
+          {
+            backgroundColor,
+            borderColor: ReceiptPalette.ink,
+            borderWidth: variant === 'secondary' ? 1.5 : 0,
+            opacity: disabled ? 0.5 : state.pressed ? 0.85 : 1,
+          },
           flattenedStyle,
         ];
       }}
       {...props}>
-      <ThemedText
-        type="smallBold"
-        style={{ color: variant === 'secondary' ? theme.text : '#ffffff', textAlign: 'center' }}>
+      <ThemedText type="smallBold" style={[styles.label, { color: textColor }]}>
         {label}
       </ThemedText>
     </Pressable>
@@ -40,7 +49,11 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.four,
-    borderRadius: Spacing.three,
+    borderRadius: Spacing.two,
     alignItems: 'center',
+  },
+  label: {
+    textAlign: 'center',
+    fontFamily: Fonts.mono,
   },
 });

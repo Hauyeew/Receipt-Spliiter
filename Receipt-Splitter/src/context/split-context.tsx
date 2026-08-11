@@ -6,7 +6,11 @@ import {
   recalculateReceipt,
   recalculateSessionTotal,
 } from '@/lib/session-helpers';
-import type { LineItem } from '@/models/LineItem';
+import {
+  getClaimedQuantity,
+  getMaxClaimQuantity,
+  type LineItem,
+} from '@/models/LineItem';
 import type { SplitSession } from '@/models/SplitSession';
 
 type SplitContextValue = {
@@ -20,6 +24,7 @@ type SplitContextValue = {
   removeParticipant: (participantId: string) => void;
   updateParticipantName: (participantId: string, name: string) => void;
   toggleItemClaim: (itemId: string, personId: string) => void;
+  adjustItemClaimQuantity: (itemId: string, personId: string, delta: number) => void;
   updateReceiptField: (field: 'tax' | 'fees' | 'merchantName', value: string | number) => void;
   updateTipSettings: (tipMode: SplitSession['tipMode'], tipValue: number) => void;
   clearSession: () => void;
@@ -54,6 +59,19 @@ export function SplitProvider({ children }: { children: ReactNode }) {
         const quantity = nextItem.quantity;
         const unitPrice = nextItem.unitPrice;
         nextItem.lineTotal = Math.round(quantity * unitPrice * 100) / 100;
+
+        // Clamp existing claims if quantity was reduced.
+        const claimedBy: Record<string, number> = {};
+        let remaining = quantity;
+        for (const [personId, claimedQuantity] of Object.entries(nextItem.claimedBy)) {
+          if (claimedQuantity <= 0 || remaining <= 0) {
+            continue;
+          }
+          const nextQuantity = Math.min(claimedQuantity, remaining);
+          claimedBy[personId] = nextQuantity;
+          remaining -= nextQuantity;
+        }
+        nextItem.claimedBy = claimedBy;
 
         return nextItem;
       });
@@ -119,10 +137,10 @@ export function SplitProvider({ children }: { children: ReactNode }) {
           return current;
         }
 
-        const lineItems = current.receipt.lineItems.map((item) => ({
-          ...item,
-          claimedBy: item.claimedBy.filter((id) => id !== participantId),
-        }));
+        const lineItems = current.receipt.lineItems.map((item) => {
+          const { [participantId]: _removed, ...claimedBy } = item.claimedBy;
+          return { ...item, claimedBy };
+        });
 
         return {
           ...current,
@@ -154,10 +172,42 @@ export function SplitProvider({ children }: { children: ReactNode }) {
             return item;
           }
 
-          const isClaimed = item.claimedBy.includes(personId);
-          const claimedBy = isClaimed
-            ? item.claimedBy.filter((id) => id !== personId)
-            : [...item.claimedBy, personId];
+          const isClaimed = getClaimedQuantity(item, personId) > 0;
+          const claimedBy = { ...item.claimedBy };
+
+          if (isClaimed) {
+            delete claimedBy[personId];
+          } else {
+            claimedBy[personId] = 1;
+          }
+
+          return { ...item, claimedBy };
+        });
+
+        return { ...current, receipt: { ...current.receipt, lineItems } };
+      });
+    },
+    [updateSession],
+  );
+
+  const adjustItemClaimQuantity = useCallback(
+    (itemId: string, personId: string, delta: number) => {
+      updateSession((current) => {
+        const lineItems = current.receipt.lineItems.map((item) => {
+          if (item.id !== itemId) {
+            return item;
+          }
+
+          const currentQuantity = getClaimedQuantity(item, personId);
+          const maxQuantity = getMaxClaimQuantity(item, personId);
+          const nextQuantity = Math.max(0, Math.min(maxQuantity, currentQuantity + delta));
+          const claimedBy = { ...item.claimedBy };
+
+          if (nextQuantity <= 0) {
+            delete claimedBy[personId];
+          } else {
+            claimedBy[personId] = nextQuantity;
+          }
 
           return { ...item, claimedBy };
         });
@@ -211,6 +261,7 @@ export function SplitProvider({ children }: { children: ReactNode }) {
       removeParticipant,
       updateParticipantName,
       toggleItemClaim,
+      adjustItemClaimQuantity,
       updateReceiptField,
       updateTipSettings,
       clearSession,
@@ -226,6 +277,7 @@ export function SplitProvider({ children }: { children: ReactNode }) {
       removeParticipant,
       updateParticipantName,
       toggleItemClaim,
+      adjustItemClaimQuantity,
       updateReceiptField,
       updateTipSettings,
       clearSession,
@@ -244,9 +296,5 @@ export function useSplitContext() {
 }
 
 export function useRequiredSession() {
-  const { session } = useSplitContext();
-  if (!session) {
-    throw new Error('No active split session');
-  }
-  return session;
+  return useSplitContext().session;
 }

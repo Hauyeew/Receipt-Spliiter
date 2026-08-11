@@ -1,4 +1,8 @@
-import { itemShareForPerson } from '@/models/LineItem';
+import {
+  getClaimerIds,
+  getTotalClaimedQuantity,
+  itemShareForPerson,
+} from '@/models/LineItem';
 import type { Receipt } from '@/models/Receipt';
 import type { SplitSession } from '@/models/SplitSession';
 
@@ -94,7 +98,7 @@ export function getActiveParticipantIds(session: SplitSession): string[] {
   const claimedIds = new Set<string>();
 
   for (const item of session.receipt.lineItems) {
-    for (const personId of item.claimedBy) {
+    for (const personId of getClaimerIds(item)) {
       claimedIds.add(personId);
     }
   }
@@ -130,18 +134,24 @@ function buildFoodByPerson(session: SplitSession): Map<string, number> {
 }
 
 function allocateTax(session: SplitSession, foodByPerson: Map<string, number>): Map<string, number> {
-  const { receipt, taxAllocation } = session;
-  const activeParticipantIds = getActiveParticipantIds(session);
+  const { receipt } = session;
+  const subtotal = getReceiptSubtotal(receipt);
+  const result = new Map<string, number>();
 
-  if (receipt.tax === 0 || activeParticipantIds.length === 0) {
-    return new Map();
+  if (receipt.tax === 0 || subtotal === 0) {
+    return result;
   }
 
-  if (taxAllocation === 'even') {
-    return allocateEvenly(receipt.tax, activeParticipantIds);
+  const taxRate = receipt.tax / subtotal;
+
+  for (const [personId, food] of foodByPerson.entries()) {
+    if (food <= 0) {
+      continue;
+    }
+    result.set(personId, roundMoney(food * taxRate));
   }
 
-  return allocateProportionally(receipt.tax, foodByPerson);
+  return result;
 }
 
 function allocateTip(session: SplitSession, foodByPerson: Map<string, number>): Map<string, number> {
@@ -202,12 +212,32 @@ export function computeAllTotals(session: SplitSession): PersonBreakdown[] {
 
 export function validateSplit(session: SplitSession): SplitValidation {
   const unclaimedItems = session.receipt.lineItems
-    .filter((item) => item.claimedBy.length === 0)
-    .map((item) => ({
-      id: item.id,
-      name: item.name,
-      lineTotal: item.lineTotal,
-    }));
+    .map((item) => {
+      if (item.quantity <= 1) {
+        if (getClaimerIds(item).length > 0) {
+          return null;
+        }
+
+        return {
+          id: item.id,
+          name: item.name,
+          lineTotal: item.lineTotal,
+        };
+      }
+
+      const claimedQuantity = getTotalClaimedQuantity(item);
+      const remainingQuantity = Math.max(0, item.quantity - claimedQuantity);
+      if (remainingQuantity <= 0) {
+        return null;
+      }
+
+      return {
+        id: item.id,
+        name: item.name,
+        lineTotal: roundMoney((remainingQuantity / item.quantity) * item.lineTotal),
+      };
+    })
+    .filter((item): item is { id: string; name: string; lineTotal: number } => item !== null);
 
   const unclaimedTotal = roundMoney(
     unclaimedItems.reduce((sum, item) => sum + item.lineTotal, 0),
