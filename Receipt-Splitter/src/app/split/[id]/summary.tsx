@@ -1,15 +1,8 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
 
+import { SplitCheckReceipt } from '@/components/split-check-receipt';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import {
-  ReceiptDivider,
-  ReceiptPaper,
-  ReceiptRow,
-  ReceiptText,
-} from '@/components/ui/receipt-paper';
 import { ScreenContainer } from '@/components/ui/screen-container';
-import { Spacing } from '@/constants/theme';
 import { useSplitContext } from '@/context/split-context';
 import { useSplitTotals } from '@/hooks/use-split-totals';
 import { validateSplit } from '@/lib/split-calculator';
@@ -26,7 +19,6 @@ export default function SummaryScreen() {
   }
 
   const activeSession = session;
-  const activeValidation = validation;
 
   function handleDone() {
     clearSession();
@@ -48,83 +40,15 @@ export default function SummaryScreen() {
       subtitle={activeSession.receipt.merchantName ?? 'Here is what everyone owes.'}
       footer={
         <>
+          <PrimaryButton
+            label="Send photo"
+            onPress={() => router.push(`/split/${id}/export`)}
+          />
           <PrimaryButton label="Edit selections" variant="secondary" onPress={handleEditSelections} />
-          <PrimaryButton label="Done" onPress={handleDone} />
+          <PrimaryButton label="Done" variant="secondary" onPress={handleDone} />
         </>
       }>
-      <ReceiptPaper>
-        <ReceiptText center bold size="lg">
-          {(activeSession.receipt.merchantName || 'RECEIPT SPLITTER').toUpperCase()}
-        </ReceiptText>
-        <ReceiptText center muted size="sm">
-          SPLIT CHECK
-        </ReceiptText>
-        <ReceiptDivider />
-
-        {!activeValidation.isValid ? (
-          <View style={styles.warningBlock}>
-            {activeValidation.unclaimedItems.length > 0 ? (
-              <ReceiptText muted size="sm">
-                {activeValidation.unclaimedItems.length} item(s) unclaimed ($
-                {activeValidation.unclaimedTotal.toFixed(2)})
-              </ReceiptText>
-            ) : null}
-            {Math.abs(activeValidation.difference) > 0.01 ? (
-              <ReceiptText muted size="sm">
-                Totals off by ${Math.abs(activeValidation.difference).toFixed(2)}
-              </ReceiptText>
-            ) : null}
-            <ReceiptDivider />
-          </View>
-        ) : null}
-
-        {totals.map((breakdown, index) => {
-          const participant = activeSession.participants.find(
-            (person) => person.id === breakdown.personId,
-          );
-          if (!participant) {
-            return null;
-          }
-
-          return (
-            <View key={breakdown.personId} style={styles.personBlock}>
-              <ReceiptRow
-                label={participant.name.toUpperCase()}
-                value={`$${breakdown.total.toFixed(2)}`}
-                bold
-                size="xl"
-              />
-              <ReceiptRow label="  Food" value={`$${breakdown.food.toFixed(2)}`} size="sm" />
-              <ReceiptRow label="  Tax" value={`$${breakdown.tax.toFixed(2)}`} size="sm" />
-              <ReceiptRow label="  Tip" value={`$${breakdown.tip.toFixed(2)}`} size="sm" />
-              {breakdown.fees > 0 ? (
-                <ReceiptRow label="  Fees" value={`$${breakdown.fees.toFixed(2)}`} size="sm" />
-              ) : null}
-              {index < totals.length - 1 ? <ReceiptDivider /> : null}
-            </View>
-          );
-        })}
-
-        <ReceiptDivider />
-        <ReceiptText bold size="sm">
-          RECEIPT TOTAL
-        </ReceiptText>
-        <ReceiptRow label="Expected" value={`$${activeValidation.receiptTotal.toFixed(2)}`} />
-        <ReceiptRow
-          label="Computed"
-          value={`$${activeValidation.computedTotal.toFixed(2)}`}
-          bold
-        />
-      </ReceiptPaper>
+      <SplitCheckReceipt session={activeSession} totals={totals} validation={validation} />
     </ScreenContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  warningBlock: {
-    gap: Spacing.one,
-  },
-  personBlock: {
-    gap: Spacing.one,
-  },
-});

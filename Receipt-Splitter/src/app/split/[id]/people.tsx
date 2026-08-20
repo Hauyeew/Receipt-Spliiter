@@ -25,8 +25,13 @@ export default function PeopleScreen() {
   }
 
   const activeSession = session;
+  const canAddPerson = newName.trim().length > 0;
 
   function handleAddParticipant() {
+    if (!canAddPerson) {
+      return;
+    }
+
     addParticipant(newName);
     setNewName('');
   }
@@ -69,6 +74,7 @@ export default function PeopleScreen() {
             <ReceiptInput
               label="Name"
               value={participant.name}
+              placeholder={index === 0 ? 'Please enter a name' : undefined}
               onChangeText={(value) => updateParticipantName(participant.id, value)}
             />
             {index < activeSession.participants.length - 1 ? <ReceiptDivider /> : null}
@@ -85,7 +91,12 @@ export default function PeopleScreen() {
           onChangeText={setNewName}
           placeholder="Friend's name"
         />
-        <PrimaryButton label="Add person" variant="secondary" onPress={handleAddParticipant} />
+        <PrimaryButton
+          label="Add person"
+          variant={canAddPerson ? 'primary' : 'secondary'}
+          disabled={!canAddPerson}
+          onPress={handleAddParticipant}
+        />
       </ReceiptPaper>
     </ScreenContainer>
   );

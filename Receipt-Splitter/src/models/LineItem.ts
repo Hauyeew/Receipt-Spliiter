@@ -1,3 +1,6 @@
+export const MIN_SHARED_AMONG = 2;
+export const MAX_SHARED_AMONG = 20;
+
 export type LineItem = {
   id: string;
   name: string;
@@ -6,6 +9,8 @@ export type LineItem = {
   lineTotal: number;
   /** personId -> how many units that person claimed */
   claimedBy: Record<string, number>;
+  /** personId -> how many people that person's claimed units were shared among */
+  sharedAmong: Record<string, number>;
 };
 
 export function getClaimedQuantity(item: LineItem, personId: string): number {
@@ -35,10 +40,21 @@ export function getMaxClaimQuantity(item: LineItem, personId: string): number {
   return Math.max(0, item.quantity - claimedByOthers);
 }
 
+export function getSharedAmong(item: LineItem, personId: string): number {
+  const sharedAmong = item.sharedAmong?.[personId] ?? 1;
+  return sharedAmong >= MIN_SHARED_AMONG ? sharedAmong : 1;
+}
+
 export function itemShareForPerson(item: LineItem, personId: string): number {
   const myQuantity = getClaimedQuantity(item, personId);
   if (myQuantity <= 0 || item.quantity <= 0) {
     return 0;
+  }
+
+  const sharedAmong = getSharedAmong(item, personId);
+  if (sharedAmong > 1) {
+    const unitPrice = item.unitPrice || item.lineTotal / item.quantity;
+    return (myQuantity * unitPrice) / sharedAmong;
   }
 
   const totalClaimed = getTotalClaimedQuantity(item);

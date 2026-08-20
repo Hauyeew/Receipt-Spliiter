@@ -47,11 +47,27 @@ export function createLineItem(partial?: Partial<LineItem>): LineItem {
     unitPrice,
     lineTotal: roundMoney(quantity * unitPrice),
     claimedBy: partial?.claimedBy ?? {},
+    sharedAmong: partial?.sharedAmong ?? {},
   };
 }
 
 export function createParticipant(name: string): Participant {
   return { id: createId(), name };
+}
+
+function tipPercentFromParsed(parsed: ParsedReceipt, lineItems: LineItem[]): number {
+  const tip = parsed.tip;
+  if (typeof tip !== 'number' || tip <= 0) {
+    return 0;
+  }
+
+  const subtotal = roundMoney(lineItems.reduce((sum, item) => sum + item.lineTotal, 0));
+  const base = subtotal + (parsed.tax ?? 0);
+  if (base <= 0) {
+    return 0;
+  }
+
+  return roundMoney((tip / base) * 100);
 }
 
 export function createSessionFromParsedReceipt(parsed: ParsedReceipt, imageUri: string): SplitSession {
@@ -82,9 +98,9 @@ export function createSessionFromParsedReceipt(parsed: ParsedReceipt, imageUri: 
   return recalculateSessionTotal({
     id: createId(),
     receipt,
-    participants: [createParticipant('Me')],
+    participants: [createParticipant('')],
     tipMode: 'percent',
-    tipValue: 18,
+    tipValue: tipPercentFromParsed(parsed, lineItems),
     taxAllocation: 'proportional',
     tipAllocation: 'proportional',
     createdAt: new Date().toISOString(),
@@ -106,9 +122,9 @@ export function createEmptySession(): SplitSession {
       fees: 0,
       total: 0,
     },
-    participants: [createParticipant('Me')],
+    participants: [createParticipant('')],
     tipMode: 'percent',
-    tipValue: 18,
+    tipValue: 0,
     taxAllocation: 'proportional',
     tipAllocation: 'proportional',
     createdAt: new Date().toISOString(),

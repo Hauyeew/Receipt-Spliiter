@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, type ViewProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,11 +9,12 @@ import { ReceiptPalette } from '@/components/ui/receipt-paper';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 
 type ScreenContainerProps = ViewProps & {
-  title: string;
+  title?: string;
   subtitle?: string;
   footer?: React.ReactNode;
   showBack?: boolean;
   variant?: 'default' | 'receipt';
+  centered?: boolean;
 };
 
 export function ScreenContainer({
@@ -21,6 +23,7 @@ export function ScreenContainer({
   footer,
   showBack = true,
   variant = 'default',
+  centered = false,
   children,
   style,
   ...props
@@ -28,6 +31,9 @@ export function ScreenContainer({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const isReceipt = variant === 'receipt';
+  const shouldCenter = centered || isReceipt;
+  const hasHeader = Boolean(showBack || title || subtitle);
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   function handleBack() {
     if (router.canGoBack()) {
@@ -37,45 +43,73 @@ export function ScreenContainer({
     router.replace('/');
   }
 
+  const header = hasHeader ? (
+    <View
+      style={styles.header}
+      onLayout={(event) => {
+        const nextHeight = event.nativeEvent.layout.height;
+        setHeaderHeight((current) => (current === nextHeight ? current : nextHeight));
+      }}>
+      {showBack ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={handleBack}
+          hitSlop={8}
+          style={styles.backButton}>
+          <ThemedText
+            type="linkPrimary"
+            style={isReceipt ? { color: ReceiptPalette.counterText } : undefined}>
+            ← Back
+          </ThemedText>
+        </Pressable>
+      ) : null}
+      {title ? (
+        <ThemedText
+          type="subtitle"
+          style={[styles.title, isReceipt && { color: ReceiptPalette.counterText }]}>
+          {title}
+        </ThemedText>
+      ) : null}
+      {subtitle ? (
+        <ThemedText
+          themeColor="textSecondary"
+          style={[styles.subtitle, isReceipt && { color: ReceiptPalette.counterMuted }]}>
+          {subtitle}
+        </ThemedText>
+      ) : null}
+    </View>
+  ) : null;
+
   return (
     <ThemedView
       style={[styles.root, isReceipt && { backgroundColor: ReceiptPalette.counter }]}>
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
+          shouldCenter && styles.scrollContentCentered,
           {
             paddingTop: insets.top + Spacing.three,
-            paddingBottom: footer ? Spacing.three : insets.bottom + BottomTabInset + Spacing.three,
+            paddingBottom: shouldCenter
+              ? footer
+                ? Spacing.three
+                : insets.bottom + Spacing.three
+              : footer
+                ? Spacing.three
+                : insets.bottom + BottomTabInset + Spacing.three,
           },
         ]}>
         <View style={[styles.inner, style]} {...props}>
-          {showBack ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              onPress={handleBack}
-              hitSlop={8}
-              style={styles.backButton}>
-              <ThemedText
-                type="linkPrimary"
-                style={isReceipt ? { color: ReceiptPalette.counterText } : undefined}>
-                ← Back
-              </ThemedText>
-            </Pressable>
-          ) : null}
-          <ThemedText
-            type="subtitle"
-            style={[styles.title, isReceipt && { color: ReceiptPalette.counterText }]}>
-            {title}
-          </ThemedText>
-          {subtitle ? (
-            <ThemedText
-              themeColor="textSecondary"
-              style={[styles.subtitle, isReceipt && { color: ReceiptPalette.counterMuted }]}>
-              {subtitle}
-            </ThemedText>
-          ) : null}
+          {header}
           {children}
+          {shouldCenter && hasHeader ? (
+            <View
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={{ height: headerHeight }}
+            />
+          ) : null}
         </View>
       </ScrollView>
       {footer ? (
@@ -101,9 +135,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.four,
   },
+  scrollContentCentered: {
+    justifyContent: 'center',
+  },
   inner: {
     width: '100%',
     maxWidth: MaxContentWidth,
+    gap: Spacing.three,
+  },
+  header: {
     gap: Spacing.three,
   },
   backButton: {

@@ -1,6 +1,5 @@
 import {
   getClaimerIds,
-  getTotalClaimedQuantity,
   itemShareForPerson,
 } from '@/models/LineItem';
 import type { Receipt } from '@/models/Receipt';
@@ -115,7 +114,7 @@ export function computeTipTotal(session: SplitSession): number {
     case 'from_receipt':
       return receipt.tip;
     case 'percent':
-      return roundMoney((getReceiptSubtotal(receipt) + receipt.tax) * (tipValue / 100));
+      return roundMoney(getReceiptSubtotal(receipt) * (tipValue / 100));
     case 'fixed':
       return tipValue;
     default:
@@ -155,6 +154,22 @@ function allocateTax(session: SplitSession, foodByPerson: Map<string, number>): 
 }
 
 function allocateTip(session: SplitSession, foodByPerson: Map<string, number>): Map<string, number> {
+  if (session.tipMode === 'percent') {
+    const result = new Map<string, number>();
+    if (session.tipValue === 0) {
+      return result;
+    }
+
+    for (const [personId, food] of foodByPerson.entries()) {
+      if (food <= 0) {
+        continue;
+      }
+      result.set(personId, roundMoney(food * (session.tipValue / 100)));
+    }
+
+    return result;
+  }
+
   const { tipAllocation } = session;
   const tipTotal = computeTipTotal(session);
   const activeParticipantIds = getActiveParticipantIds(session);
@@ -213,28 +228,21 @@ export function computeAllTotals(session: SplitSession): PersonBreakdown[] {
 export function validateSplit(session: SplitSession): SplitValidation {
   const unclaimedItems = session.receipt.lineItems
     .map((item) => {
-      if (item.quantity <= 1) {
-        if (getClaimerIds(item).length > 0) {
-          return null;
-        }
-
-        return {
-          id: item.id,
-          name: item.name,
-          lineTotal: item.lineTotal,
-        };
-      }
-
-      const claimedQuantity = getTotalClaimedQuantity(item);
-      const remainingQuantity = Math.max(0, item.quantity - claimedQuantity);
-      if (remainingQuantity <= 0) {
+      const allocated = roundMoney(
+        session.participants.reduce(
+          (sum, participant) => sum + itemShareForPerson(item, participant.id),
+          0,
+        ),
+      );
+      const remaining = roundMoney(item.lineTotal - allocated);
+      if (remaining <= 0.01) {
         return null;
       }
 
       return {
         id: item.id,
         name: item.name,
-        lineTotal: roundMoney((remainingQuantity / item.quantity) * item.lineTotal),
+        lineTotal: remaining,
       };
     })
     .filter((item): item is { id: string; name: string; lineTotal: number } => item !== null);

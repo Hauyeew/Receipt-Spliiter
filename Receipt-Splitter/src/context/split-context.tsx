@@ -9,6 +9,8 @@ import {
 import {
   getClaimedQuantity,
   getMaxClaimQuantity,
+  MIN_SHARED_AMONG,
+  MAX_SHARED_AMONG,
   type LineItem,
 } from '@/models/LineItem';
 import type { SplitSession } from '@/models/SplitSession';
@@ -25,6 +27,7 @@ type SplitContextValue = {
   updateParticipantName: (participantId: string, name: string) => void;
   toggleItemClaim: (itemId: string, personId: string) => void;
   adjustItemClaimQuantity: (itemId: string, personId: string, delta: number) => void;
+  setItemSharedAmong: (itemId: string, personId: string, peopleCount: number) => void;
   updateReceiptField: (field: 'tax' | 'fees' | 'merchantName', value: string | number) => void;
   updateTipSettings: (tipMode: SplitSession['tipMode'], tipValue: number) => void;
   clearSession: () => void;
@@ -138,8 +141,9 @@ export function SplitProvider({ children }: { children: ReactNode }) {
         }
 
         const lineItems = current.receipt.lineItems.map((item) => {
-          const { [participantId]: _removed, ...claimedBy } = item.claimedBy;
-          return { ...item, claimedBy };
+          const { [participantId]: _removedClaim, ...claimedBy } = item.claimedBy;
+          const { [participantId]: _removedShare, ...sharedAmong } = item.sharedAmong ?? {};
+          return { ...item, claimedBy, sharedAmong };
         });
 
         return {
@@ -177,10 +181,12 @@ export function SplitProvider({ children }: { children: ReactNode }) {
 
           if (isClaimed) {
             delete claimedBy[personId];
-          } else {
-            claimedBy[personId] = 1;
+            const sharedAmong = { ...(item.sharedAmong ?? {}) };
+            delete sharedAmong[personId];
+            return { ...item, claimedBy, sharedAmong };
           }
 
+          claimedBy[personId] = 1;
           return { ...item, claimedBy };
         });
 
@@ -205,11 +211,44 @@ export function SplitProvider({ children }: { children: ReactNode }) {
 
           if (nextQuantity <= 0) {
             delete claimedBy[personId];
-          } else {
-            claimedBy[personId] = nextQuantity;
+            const sharedAmong = { ...(item.sharedAmong ?? {}) };
+            delete sharedAmong[personId];
+            return { ...item, claimedBy, sharedAmong };
           }
 
+          claimedBy[personId] = nextQuantity;
           return { ...item, claimedBy };
+        });
+
+        return { ...current, receipt: { ...current.receipt, lineItems } };
+      });
+    },
+    [updateSession],
+  );
+
+  const setItemSharedAmong = useCallback(
+    (itemId: string, personId: string, peopleCount: number) => {
+      updateSession((current) => {
+        const lineItems = current.receipt.lineItems.map((item) => {
+          if (item.id !== itemId) {
+            return item;
+          }
+
+          const claimedBy = { ...item.claimedBy };
+          const sharedAmong = { ...(item.sharedAmong ?? {}) };
+          const nextCount = Math.round(peopleCount);
+
+          if (nextCount < MIN_SHARED_AMONG) {
+            delete sharedAmong[personId];
+            return { ...item, sharedAmong };
+          }
+
+          sharedAmong[personId] = Math.min(MAX_SHARED_AMONG, nextCount);
+          if ((claimedBy[personId] ?? 0) <= 0) {
+            claimedBy[personId] = 1;
+          }
+
+          return { ...item, claimedBy, sharedAmong };
         });
 
         return { ...current, receipt: { ...current.receipt, lineItems } };
@@ -262,6 +301,7 @@ export function SplitProvider({ children }: { children: ReactNode }) {
       updateParticipantName,
       toggleItemClaim,
       adjustItemClaimQuantity,
+      setItemSharedAmong,
       updateReceiptField,
       updateTipSettings,
       clearSession,
@@ -278,6 +318,7 @@ export function SplitProvider({ children }: { children: ReactNode }) {
       updateParticipantName,
       toggleItemClaim,
       adjustItemClaimQuantity,
+      setItemSharedAmong,
       updateReceiptField,
       updateTipSettings,
       clearSession,

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -20,7 +20,23 @@ export default function NewSplitScreen() {
   const router = useRouter();
   const { setSession } = useSplitContext();
   const [isScanning, setIsScanning] = useState(false);
+  const [scanAttempt, setScanAttempt] = useState(0);
+  const [showSlowScanHint, setShowSlowScanHint] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const scanRequestId = useRef(0);
+
+  useEffect(() => {
+    setShowSlowScanHint(false);
+    if (!isScanning) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setShowSlowScanHint(true);
+    }, 15_000);
+
+    return () => clearTimeout(timeout);
+  }, [isScanning, scanAttempt]);
 
   function startBlankSession() {
     const session = createEmptySession();
@@ -29,23 +45,37 @@ export default function NewSplitScreen() {
   }
 
   async function handleScanReceipt() {
+    const requestId = ++scanRequestId.current;
     setScanError(null);
 
     try {
       const image = await pickReceiptImage();
-      if (!image) {
+      if (!image || requestId !== scanRequestId.current) {
+        if (requestId === scanRequestId.current) {
+          setIsScanning(false);
+        }
         return;
       }
 
       setIsScanning(true);
+      setScanAttempt((current) => current + 1);
       const parsed = await scanReceiptImage(image.base64, image.mimeType);
+      if (requestId !== scanRequestId.current) {
+        return;
+      }
+
       const session = createSessionFromParsedReceipt(parsed, image.uri);
       setSession(session);
       router.push(`/split/${session.id}/review`);
     } catch (error) {
+      if (requestId !== scanRequestId.current) {
+        return;
+      }
       setScanError(error instanceof Error ? error.message : 'Failed to scan receipt.');
     } finally {
-      setIsScanning(false);
+      if (requestId === scanRequestId.current) {
+        setIsScanning(false);
+      }
     }
   }
 
@@ -70,11 +100,21 @@ export default function NewSplitScreen() {
           Upload or photograph a receipt and we&apos;ll read the items for you.
         </ReceiptText>
         {isScanning ? (
-          <View style={styles.scanningRow}>
-            <ActivityIndicator color={ReceiptPalette.ink} />
-            <ReceiptText muted size="sm">
-              Reading receipt...
-            </ReceiptText>
+          <View style={styles.scanningBlock}>
+            <View style={styles.scanningRow}>
+              <ActivityIndicator color={ReceiptPalette.ink} />
+              <ReceiptText muted size="sm">
+                Reading receipt...
+              </ReceiptText>
+            </View>
+            {showSlowScanHint ? (
+              <>
+                <ReceiptText size="sm">
+                  If scanning is taking too long, please retry to upload
+                </ReceiptText>
+                <PrimaryButton label="Retry upload" onPress={handleScanReceipt} />
+              </>
+            ) : null}
           </View>
         ) : (
           <PrimaryButton label="Upload receipt photo" onPress={handleScanReceipt} />
@@ -101,6 +141,9 @@ export default function NewSplitScreen() {
 }
 
 const styles = StyleSheet.create({
+  scanningBlock: {
+    gap: Spacing.two,
+  },
   scanningRow: {
     flexDirection: 'row',
     alignItems: 'center',

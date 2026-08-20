@@ -7,6 +7,7 @@ import {
   ReceiptDivider,
   ReceiptInput,
   ReceiptPaper,
+  ReceiptPalette,
   ReceiptRow,
   ReceiptText,
 } from '@/components/ui/receipt-paper';
@@ -51,13 +52,6 @@ export default function ReviewScreen() {
         <ReceiptText center bold size="lg">
           {session.receipt.merchantName?.toUpperCase() || 'YOUR RECEIPT'}
         </ReceiptText>
-        <ReceiptInput
-          label="Merchant"
-          value={session.receipt.merchantName ?? ''}
-          onChangeText={(value) => updateReceiptField('merchantName', value)}
-          placeholder="Restaurant name"
-          style={styles.centerInput}
-        />
 
         {session.receipt.imageUri ? (
           <>
@@ -162,9 +156,18 @@ export default function ReviewScreen() {
           </ReceiptText>
         ) : null}
 
+        {!session.tipValue ? (
+          <View style={styles.tipNotice}>
+            <ReceiptText bold size="md" style={styles.tipNoticeText}>
+              Please enter the percentage tipped
+            </ReceiptText>
+          </View>
+        ) : null}
         <ReceiptInput
           label="Tip %"
-          value={String(session.tipValue)}
+          value={session.tipValue ? String(session.tipValue) : ''}
+          placeholder="e.g. 18"
+          emphasis={!session.tipValue}
           keyboardType="decimal-pad"
           onChangeText={(value) => updateTipSettings('percent', parseMoneyInput(value))}
         />
@@ -177,9 +180,6 @@ export default function ReviewScreen() {
 }
 
 const styles = StyleSheet.create({
-  centerInput: {
-    textAlign: 'center',
-  },
   receiptImage: {
     width: '100%',
     height: 180,
@@ -201,5 +201,15 @@ const styles = StyleSheet.create({
   },
   addItem: {
     paddingVertical: Spacing.two,
+  },
+  tipNotice: {
+    backgroundColor: ReceiptPalette.accentSoft,
+    borderLeftWidth: 4,
+    borderLeftColor: ReceiptPalette.accent,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.two,
+  },
+  tipNoticeText: {
+    color: ReceiptPalette.accentInk,
   },
 });

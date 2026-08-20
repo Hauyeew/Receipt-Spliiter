@@ -11,6 +11,9 @@ export const ReceiptPalette = {
   counter: '#2A2724',
   counterText: '#F5F0E8',
   counterMuted: '#A8A29E',
+  accent: '#C2410C',
+  accentSoft: '#FDE68A',
+  accentInk: '#9A3412',
 } as const;
 
 function SerratedEdge({ edge }: { edge: 'top' | 'bottom' }) {
@@ -106,20 +109,26 @@ export function ReceiptRow({ label, value, bold = false, size = 'md' }: ReceiptR
 type ReceiptInputProps = TextInputProps & {
   label?: string;
   size?: 'md' | 'lg';
+  emphasis?: boolean;
 };
 
-export function ReceiptInput({ label, size = 'md', style, ...props }: ReceiptInputProps) {
+export function ReceiptInput({ label, size = 'md', style, emphasis = false, ...props }: ReceiptInputProps) {
   return (
     <View style={styles.inputBlock}>
       {label ? (
-        <ReceiptText muted size="sm">
+        <ReceiptText muted={!emphasis} bold={emphasis} size="sm" style={emphasis ? styles.emphasisLabel : undefined}>
           {label}
         </ReceiptText>
       ) : null}
       <TextInput
-        placeholderTextColor={ReceiptPalette.muted}
+        placeholderTextColor={emphasis ? ReceiptPalette.accent : ReceiptPalette.muted}
         {...props}
-        style={[styles.input, size === 'lg' && styles.inputLg, style]}
+        style={[
+          styles.input,
+          size === 'lg' && styles.inputLg,
+          emphasis && styles.emphasisInput,
+          style,
+        ]}
       />
     </View>
   );
@@ -225,5 +234,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 24,
     fontWeight: '700',
+  },
+  emphasisLabel: {
+    color: ReceiptPalette.accent,
+  },
+  emphasisInput: {
+    fontWeight: '700',
+    borderBottomWidth: 2,
+    borderBottomColor: ReceiptPalette.accent,
   },
 });

@@ -17,15 +17,18 @@ import {
   getClaimedQuantity,
   getClaimerIds,
   getMaxClaimQuantity,
+  getSharedAmong,
   getTotalClaimedQuantity,
   itemShareForPerson,
+  MAX_SHARED_AMONG,
+  MIN_SHARED_AMONG,
 } from '@/models/LineItem';
 
 export default function SelectItemsScreen() {
   const { id, personId } = useLocalSearchParams<{ id: string; personId: string }>();
   const router = useRouter();
   const session = useRequiredSession();
-  const { adjustItemClaimQuantity } = useSplitContext();
+  const { adjustItemClaimQuantity, setItemSharedAmong } = useSplitContext();
   const breakdown = usePersonTotal(session, personId);
 
   if (!session) {
@@ -59,7 +62,7 @@ export default function SelectItemsScreen() {
     <ScreenContainer
       variant="receipt"
       title={`What did ${participant.name} order?`}
-      subtitle="Use + / − to claim how many of each item you ordered."
+      subtitle="Use + / − to claim items. Tap Shared if you split an item with others."
       footer={
         <>
           <View style={styles.footerTotals}>
@@ -92,6 +95,8 @@ export default function SelectItemsScreen() {
           const maxQuantity = getMaxClaimQuantity(item, personId);
           const remainingTotal = Math.max(0, item.quantity - getTotalClaimedQuantity(item));
           const claimers = getClaimerIds(item).length;
+          const sharedAmong = getSharedAmong(item, personId);
+          const isShared = sharedAmong > 1;
           const isSelected = claimedQuantity > 0;
           const isMultiQuantity = item.quantity > 1;
 
@@ -104,17 +109,20 @@ export default function SelectItemsScreen() {
                     {isMultiQuantity
                       ? `${item.quantity} x $${item.unitPrice.toFixed(2)} = $${item.lineTotal.toFixed(2)}`
                       : `$${item.lineTotal.toFixed(2)}`}
-                    {isMultiQuantity
-                      ? remainingTotal > 0
-                        ? ` · ${remainingTotal} left`
-                        : ' · fully claimed'
-                      : claimers > 1
-                        ? ` · split ${claimers} ways`
-                        : ''}
+                    {isShared
+                      ? ` · split ${sharedAmong} ways`
+                      : isMultiQuantity
+                        ? remainingTotal > 0
+                          ? ` · ${remainingTotal} left`
+                          : ' · fully claimed'
+                        : claimers > 1
+                          ? ` · split ${claimers} ways`
+                          : ''}
                   </ReceiptText>
                   {isSelected ? (
                     <ReceiptText muted size="sm">
                       Your share: ${share.toFixed(2)}
+                      {isShared ? ` · 1 of ${sharedAmong} people` : ''}
                     </ReceiptText>
                   ) : null}
                 </View>
@@ -143,6 +151,60 @@ export default function SelectItemsScreen() {
                     <ReceiptText bold>+</ReceiptText>
                   </Pressable>
                 </View>
+              </View>
+
+              <View style={styles.shareRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isShared ? `Unshare ${item.name}` : `Mark ${item.name} as shared`
+                  }
+                  onPress={() =>
+                    setItemSharedAmong(item.id, personId, isShared ? 1 : MIN_SHARED_AMONG)
+                  }
+                  style={[styles.shareButton, isShared && styles.shareButtonActive]}>
+                  <ReceiptText
+                    bold
+                    size="sm"
+                    style={isShared ? styles.shareButtonActiveText : undefined}>
+                    {isShared ? 'SHARED' : 'SHARED?'}
+                  </ReceiptText>
+                </Pressable>
+
+                {isShared ? (
+                  <View style={styles.shareCount}>
+                    <ReceiptText muted size="sm">
+                      people
+                    </ReceiptText>
+                    <View style={styles.stepper}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Fewer people sharing ${item.name}`}
+                        disabled={sharedAmong <= MIN_SHARED_AMONG}
+                        onPress={() => setItemSharedAmong(item.id, personId, sharedAmong - 1)}
+                        style={[
+                          styles.stepperButton,
+                          sharedAmong <= MIN_SHARED_AMONG && styles.stepperDisabled,
+                        ]}>
+                        <ReceiptText bold>−</ReceiptText>
+                      </Pressable>
+                      <ReceiptText bold style={styles.stepperValue}>
+                        {sharedAmong}
+                      </ReceiptText>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`More people sharing ${item.name}`}
+                        disabled={sharedAmong >= MAX_SHARED_AMONG}
+                        onPress={() => setItemSharedAmong(item.id, personId, sharedAmong + 1)}
+                        style={[
+                          styles.stepperButton,
+                          sharedAmong >= MAX_SHARED_AMONG && styles.stepperDisabled,
+                        ]}>
+                        <ReceiptText bold>+</ReceiptText>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : null}
               </View>
               {index < session.receipt.lineItems.length - 1 ? <ReceiptDivider /> : null}
             </View>
@@ -187,6 +249,31 @@ const styles = StyleSheet.create({
   stepperValue: {
     minWidth: 18,
     textAlign: 'center',
+  },
+  shareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  shareButton: {
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: ReceiptPalette.ink,
+    backgroundColor: ReceiptPalette.paper,
+  },
+  shareButtonActive: {
+    backgroundColor: ReceiptPalette.ink,
+  },
+  shareButtonActiveText: {
+    color: ReceiptPalette.paper,
+  },
+  shareCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   footerTotals: {
     gap: Spacing.one,
