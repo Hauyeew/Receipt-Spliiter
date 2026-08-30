@@ -57,7 +57,7 @@ Rules:
 - Use plain item names without SKU codes when possible
 - All amounts are in USD`;
 
-const SCAN_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'] as const;
+const SCAN_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'] as const;
 const MAX_ATTEMPTS_PER_MODEL = 3;
 const RETRY_DELAYS_MS = [1500, 3000, 5000];
 const MAX_IMAGE_EDGE = 1600;

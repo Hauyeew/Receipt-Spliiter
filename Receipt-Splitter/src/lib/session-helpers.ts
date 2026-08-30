@@ -51,6 +51,63 @@ export function createLineItem(partial?: Partial<LineItem>): LineItem {
   };
 }
 
+function normalizeItemName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[.,;:!?]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function mergeDuplicateLineItems(items: LineItem[]): LineItem[] {
+  const merged: LineItem[] = [];
+  const indexByKey = new Map<string, number>();
+
+  for (const item of items) {
+    const nameKey = normalizeItemName(item.name);
+    if (!nameKey) {
+      merged.push({
+        ...item,
+        claimedBy: { ...item.claimedBy },
+        sharedAmong: { ...item.sharedAmong },
+      });
+      continue;
+    }
+
+    const key = `${nameKey}|${item.unitPrice.toFixed(2)}`;
+    const existingIndex = indexByKey.get(key);
+
+    if (existingIndex === undefined) {
+      indexByKey.set(key, merged.length);
+      merged.push({
+        ...item,
+        claimedBy: { ...item.claimedBy },
+        sharedAmong: { ...item.sharedAmong },
+      });
+      continue;
+    }
+
+    const existing = merged[existingIndex];
+    const quantity = existing.quantity + item.quantity;
+    const claimedBy = { ...existing.claimedBy };
+
+    for (const [personId, claimedQuantity] of Object.entries(item.claimedBy)) {
+      claimedBy[personId] = (claimedBy[personId] ?? 0) + claimedQuantity;
+    }
+
+    merged[existingIndex] = {
+      ...existing,
+      quantity,
+      lineTotal: roundMoney(quantity * existing.unitPrice),
+      claimedBy,
+      sharedAmong: { ...existing.sharedAmong, ...item.sharedAmong },
+    };
+  }
+
+  return merged;
+}
+
 export function createParticipant(name: string): Participant {
   return { id: createId(), name };
 }
@@ -71,7 +128,7 @@ function tipPercentFromParsed(parsed: ParsedReceipt, lineItems: LineItem[]): num
 }
 
 export function createSessionFromParsedReceipt(parsed: ParsedReceipt, imageUri: string): SplitSession {
-  const lineItems =
+  const mappedItems =
     parsed.lineItems.length > 0
       ? parsed.lineItems.map((item) =>
           createLineItem({
@@ -81,6 +138,7 @@ export function createSessionFromParsedReceipt(parsed: ParsedReceipt, imageUri: 
           }),
         )
       : [createLineItem({ name: 'Item 1' })];
+  const lineItems = mergeDuplicateLineItems(mappedItems);
 
   const receipt: Receipt = {
     id: createId(),

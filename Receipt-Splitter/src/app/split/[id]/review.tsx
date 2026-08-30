@@ -1,5 +1,6 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -14,8 +15,9 @@ import {
 import { ScreenContainer } from '@/components/ui/screen-container';
 import { Spacing } from '@/constants/theme';
 import { useRequiredSession, useSplitContext } from '@/context/split-context';
+import { parseMoneyInput, sanitizeDecimalInput } from '@/lib/format-money';
+import { mergeDuplicateLineItems } from '@/lib/session-helpers';
 import { computeTipTotal, getReceiptSubtotal } from '@/lib/split-calculator';
-import { parseMoneyInput } from '@/lib/format-money';
 
 export default function ReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,7 +29,11 @@ export default function ReviewScreen() {
     removeLineItem,
     updateReceiptField,
     updateTipSettings,
+    updateSession,
   } = useSplitContext();
+  const [tipPercentText, setTipPercentText] = useState(() =>
+    session?.tipValue ? String(session.tipValue) : '',
+  );
 
   if (!session) {
     return <Redirect href="/" />;
@@ -45,7 +51,16 @@ export default function ReviewScreen() {
       footer={
         <PrimaryButton
           label="Continue to participants"
-          onPress={() => router.push(`/split/${id}/people`)}
+          onPress={() => {
+            updateSession((current) => ({
+              ...current,
+              receipt: {
+                ...current.receipt,
+                lineItems: mergeDuplicateLineItems(current.receipt.lineItems),
+              },
+            }));
+            router.push(`/split/${id}/people`);
+          }}
         />
       }>
       <ReceiptPaper>
@@ -156,7 +171,7 @@ export default function ReviewScreen() {
           </ReceiptText>
         ) : null}
 
-        {!session.tipValue ? (
+        {!parseMoneyInput(tipPercentText) ? (
           <View style={styles.tipNotice}>
             <ReceiptText bold size="md" style={styles.tipNoticeText}>
               Please enter the percentage tipped
@@ -165,11 +180,15 @@ export default function ReviewScreen() {
         ) : null}
         <ReceiptInput
           label="Tip %"
-          value={session.tipValue ? String(session.tipValue) : ''}
-          placeholder="e.g. 18"
-          emphasis={!session.tipValue}
+          value={tipPercentText}
+          placeholder="e.g. 18.5"
+          emphasis={!parseMoneyInput(tipPercentText)}
           keyboardType="decimal-pad"
-          onChangeText={(value) => updateTipSettings('percent', parseMoneyInput(value))}
+          onChangeText={(value) => {
+            const next = sanitizeDecimalInput(value);
+            setTipPercentText(next);
+            updateTipSettings('percent', parseMoneyInput(next));
+          }}
         />
         <ReceiptRow label="TIP" value={`$${tipTotal.toFixed(2)}`} />
         <ReceiptDivider />
